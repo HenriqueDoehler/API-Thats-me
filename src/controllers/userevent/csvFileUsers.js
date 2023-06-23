@@ -81,6 +81,8 @@ const addEventUsersCsv = async (req, res) => {
           ]);
           if (userResult.rowCount > 0) {
             if (!res.headersSent) {
+              await client.release();
+              await client.query("ROLLBACK");
               return res
                 .status(400)
                 .json("Estes participantes já estão registrados neste evento.");
@@ -93,13 +95,18 @@ const addEventUsersCsv = async (req, res) => {
           const insertValues = [user.name, user.email, user.phone, event_id];
           await client.query(insertQuery, insertValues);
         }
-        await client.query("COMMIT");
+
         if (!res.headersSent) {
+          await client.release();
+          await client.query("COMMIT");
           return res
             .status(200)
             .json("Os participantes foram cadastrados com sucesso!");
         }
       } catch (error) {
+        await client.release();
+        await client.query("ROLLBACK");
+
         console.log(`Erro ao inserir os usuários: ${error.message}`);
         if (!res.headersSent) {
           return res.status(401).json(error);
@@ -107,11 +114,7 @@ const addEventUsersCsv = async (req, res) => {
       }
     });
   } catch (error) {
-    await client.query("ROLLBACK");
-
     return res.status(400).json(error.message);
-  } finally {
-    client && client.release();
   }
 };
 
